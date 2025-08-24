@@ -9,6 +9,7 @@
 !LICENSE
 !/UnityPackage/
 !.gitignore
+!/img/
 
 # OS Stuff
 .DS_Store

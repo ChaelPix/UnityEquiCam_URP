@@ -1,66 +1,86 @@
-﻿using UnityEngine;
+﻿// Filename: EquiCam.cs
+using UnityEngine;
+using UnityEngine.Rendering;
+
 namespace BodhiDonselaar
 {
-	[RequireComponent(typeof(Camera))]
-	public class EquiCam : MonoBehaviour
-	{
-		private static Material equi;
-		public Size RenderResolution = Size.Default;
-		private RenderTexture cubemap;
-		private Camera cam;
-		private GameObject child;
-		public enum Size
-		{
-			High = 2048,
-			Default = 1024,
-			Low = 512,
-			Minimum = 256
-		}
-		void OnEnable()
-		{
-			if (equi == null) equi = new Material(Resources.Load<Shader>("EquiCam"));
-			child = new GameObject();
-			child.hideFlags = HideFlags.HideInHierarchy;
-			child.transform.SetParent(transform);
-			child.transform.localPosition = Vector3.zero;
-			child.transform.localEulerAngles = Vector3.zero;
-			cam = child.AddComponent<Camera>();
-			cam.CopyFrom(GetComponent<Camera>());
-			child.SetActive(false);
-			New();
-		}
-		void OnDisable()
-		{
-			if (child != null) DestroyImmediate(child);
-			if (cubemap != null)
-			{
-				cubemap.Release();
-				DestroyImmediate(cubemap);
-			}
-		}
-		void OnRenderImage(RenderTexture src, RenderTexture des)
-		{
-			if (cubemap.width != (int)RenderResolution) New();
-			cam.RenderToCubemap(cubemap);
-			Shader.SetGlobalFloat("FORWARD", cam.transform.eulerAngles.y * 0.01745f);
-			Graphics.Blit(cubemap, des, equi);
-		}
-		private void New()
-		{
-			cam.targetTexture = null;
-			if (cubemap != null)
-			{
-				cubemap.Release();
-				DestroyImmediate(cubemap);
-			}
-			cubemap = new RenderTexture((int)RenderResolution, (int)RenderResolution, 0, RenderTextureFormat.ARGB32);
-			cubemap.antiAliasing = 1;
-			cubemap.filterMode = FilterMode.Bilinear;
-			cubemap.anisoLevel = 0;
-			cubemap.dimension = UnityEngine.Rendering.TextureDimension.Cube;
-			cubemap.autoGenerateMips = false;
-			cubemap.useMipMap = false;
-			cam.targetTexture = cubemap;
-		}
-	}
+    [RequireComponent(typeof(Camera))]
+    public class EquiCam : MonoBehaviour
+    {
+        public Material equiMaterial; 
+        [SerializeField]
+        private Size RenderResolution = Size.Default;
+
+        [HideInInspector]
+        public RenderTexture cubemap;
+
+        private Camera cam;
+        private GameObject child;
+
+        public enum Size
+        {
+            High = 2048,
+            Default = 1024,
+            Low = 512,
+            Minimum = 256
+        }
+
+        void OnEnable()
+        {
+            if (child == null)
+            {
+                child = new GameObject("CubemapCamera");
+                child.hideFlags = HideFlags.HideAndDontSave;
+                child.transform.SetParent(transform);
+                child.transform.localPosition = Vector3.zero;
+                child.transform.localRotation = Quaternion.identity;
+                cam = child.AddComponent<Camera>();
+                cam.CopyFrom(GetComponent<Camera>());
+                cam.cullingMask = GetComponent<Camera>().cullingMask;
+                child.SetActive(false);
+            }
+            
+            NewCubemap();
+        }
+
+        void OnDisable()
+        {
+            if (child != null) DestroyImmediate(child);
+            if (cubemap != null)
+            {
+                cubemap.Release();
+                DestroyImmediate(cubemap);
+            }
+        }
+        
+        void LateUpdate()
+        {
+            if (cam == null || equiMaterial == null) return;
+            
+            if (cubemap.width != (int)RenderResolution)
+            {
+                NewCubemap();
+            }
+
+            cam.transform.position = transform.position;
+            cam.RenderToCubemap(cubemap);
+
+            equiMaterial.SetTexture("_MainTex", cubemap);
+            equiMaterial.SetFloat("FORWARD", transform.eulerAngles.y * Mathf.Deg2Rad);
+        }
+
+        private void NewCubemap()
+        {
+            if (cubemap != null)
+            {
+                cubemap.Release();
+                DestroyImmediate(cubemap);
+            }
+
+            cubemap = new RenderTexture((int)RenderResolution, (int)RenderResolution, 16, RenderTextureFormat.Default);
+            cubemap.dimension = TextureDimension.Cube;
+            cubemap.hideFlags = HideFlags.HideAndDontSave;
+            cubemap.Create();
+        }
+    }
 }
